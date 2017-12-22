@@ -1,0 +1,708 @@
+---
+title: "final_manying_zhang"
+author: "Manying"
+date: "17/12/2017"
+output: html_document
+---
+
+# Regressions (reread the text) and comprehension accuracy
+
+## Introduction and dataframe
+
+This project is to discuss the importance of reading regression to the reading comprehension, that's to say, to discuss the effect of using RSVP tools in readings, by using the experiment data of UC San Diego. 
+
+```{r}
+source("function_manying_zhang.R")
+```
+
+
+```{r}
+df <- read.csv("/Users/manyingz/Googledrive/TAL/M2S1/lundi/stats_R/FinalProject/bb4916286v_1_1/Analysis/NRX_gardenpath.csv",header = TRUE)
+# print(df)
+```
+
+The column "displaytype" shows the way that the text is displayed. When it notes "X", it is to say that this sentence is displayed with the trial-mask paradigm who replaces all the words that the subject red by X, for eg., the word "abcde" is replaced by 5 *x*s: "xxxxx". In this situation, even the subject makes a regression eye movement, he can only see *"xxx"*s. This manipulation garenteens the subject not able to get information that he had read.
+
+The column "verbcontrol" shows the type of sentence, "gardenpath" means that this sentence has an ambiguous verb which makes the sentence not straightforward (gardenpath), and "control" means that it's an unambiguous phrase.
+
+The "accuracy" is 1 if the subject correctly answered the question so as to understand the sentence, 0 not.
+
+3 calibrate point to capture the regression movements of eyes, "regin"=regressions into the subject noun=regressions that most worthy to study; "regout"=regressions out of the disambiguating verb=regressions that used to compare and to assess whether the regressions into the subject noun
+were related to detecting the structural ambiguity.
+
+## Conditions and accuracy
+
+```{r}
+df_sub <- subset(df,select = c(displaytype,verbcontrol,accuracy))
+# print(df_sub)
+```
+
+### Accuracy count and percentage in different conditions
+
+Let's take a look of how many questions are correctly answered in different conditions of reading.
+
+```{r}
+df_p <- dplyr::filter(df_sub,accuracy==1)
+p_x <- ggplot2::ggplot(df_p, ggplot2::aes(x=verbcontrol,fill=displaytype), position_dodge(width=1)) + # construire un objet: graphe
+    ggplot2::geom_bar(position="dodge")
+print(p_x)
+```
+
+As we can see the sentences who have the verb controlled (to be a unambiguous verb) gives more accuracy of understanding than the sentences of gardenpath who have the ambiguous verb.
+
+When we read the unambiguous sentence, the performance of reading in condition of normal display and trial-mask paradigm have almost same number of accuracy (only a slight difference between them), but when the sentence itself is ambiguous, this difference becomes more evident.
+
+We then want to calculate the percentage of accuracy of these different conditions.
+
+```{r}
+perc_control_x1 <- calculate_percentage(df,"control","X")
+perc_control_normal1 <- calculate_percentage(df,"control","normal")
+perc_path_x1 <- calculate_percentage(df,"gardenpath","X")
+perc_path_normal1 <- calculate_percentage(df,"gardenpath","normal")
+
+print(perc_control_x1)
+print(perc_control_normal1)
+print(perc_path_x1)
+print(perc_path_normal1)
+```
+
+We then give it a visualization.
+
+```{r}
+df_p <- data.frame("SentenceType"=c("control","control","gardenpath","gardenpath"), "DisplayType"=c("X","normal","X","normal"), "Percentage"=c(perc_control_x1,perc_control_normal1,perc_path_x1,perc_path_normal1))
+
+
+p_d <- ggplot2::ggplot(df_p, ggplot2::aes(x=SentenceType,colour=DisplayType,y=Percentage), position_dodge(width=1.5)) + # construire un objet: graphe
+    ggplot2::geom_point()+
+    ggplot2::ylim(0,1)
+print(p_d)
+```
+
+From this work we can see that the difference of the percentage of accuracy for each of the two display types become more apparent when reading unambiguous sentences.
+
+### Are sentence type/display type and accuracy independent?
+
+#### Chi-square test for SentenceType and Accuracy:
+
+Chi square test is for testing the two categorical variables' level of dependence/independence. We want to have a look at how dependent are between the SentenceType and the Accuracy.
+
+**Problem**
+
+Test the hypothesis whether the accuracy is independent of the sentence ambiguity at .05 significance level.
+
+**Table**
+
+Chi-square test requires table form in frequency. So we make a *contengincy table*.
+
+```{r}
+tb1 = table(df_sub$verbcontrol, df_sub$accuracy)
+tb1
+```
+
+
+**Solution**
+
+We apply the chisq.test function to the contingency table tbl, and found the p-value to be very very small and so <0.05.
+
+```{r}
+chisq.test(tb1)
+```
+
+**Answer**
+
+As the p-value much smaller than the .05 significance level, we reject the null hypothesis that the accuracy is dependent of the sentence ambiguity level.
+
+#### Chi-square test for display type
+
+```{r}
+tb2 = table(df_sub$displaytype, df_sub$accuracy)
+chisq.test(tb2)
+```
+
+Also an evidence that the two variables are dependent.
+
+```{r}
+tb_p = table(df_sub$displaytype, df_sub$verbcontrol)
+chisq.test(tb_p)
+```
+
+Display type and sentece type are independent.
+
+### Permutation test to see the effect of sentence type and the display type to the percentage of accuracy
+
+#### Sentence type and accuracy
+
+```{r}
+diff_acc_verbcontrol <- difference_in_accuracy(df_sub,"verbcontrol","control","gardenpath")
+print(diff_acc_verbcontrol)
+```
+
+```{r}
+N_SAMPLES <- 1000
+stats_diff_acc_verbcontrol <- rep(0, N_SAMPLES)
+n <- 0
+for (i in 1:N_SAMPLES) {
+  d_fake <- randomize_data(df_sub, "verbcontrol")
+  stats_diff_acc_verbcontrol[i] <- difference_in_accuracy(d_fake,"verbcontrol","control","gardenpath")
+  if (stats_diff_acc_verbcontrol[i]>=diff_acc_verbcontrol) {
+    n <- n+1
+  }
+  p_value = n/N_SAMPLES
+}
+
+stats_verbcontrol_diff_acc <- tibble::tibble(stats_diff_acc_verbcontrol)
+print(p_value)
+
+```
+
+```{r}
+p_diff_acc_verbcontrol <- ggplot2::ggplot(stats_verbcontrol_diff_acc,
+                       ggplot2::aes_string(x=stats_diff_acc_verbcontrol)) +
+    ggplot2::xlab("difference_acc_verbcontrol")+
+    ggplot2::geom_histogram(fill="skyblue", colour="blue") +
+    ggplot2::ggtitle("Difference in accuracy by verbcontrol")+
+  ggplot2::geom_vline(ggplot2::aes(xintercept=diff_acc_verbcontrol),
+                                 lwd=1)
+print(p_diff_acc_verbcontrol)
+```
+
+The p_value is 0 so that it has a statistical significance which reject the null hypothesis and so that support the hypothesis that verbcontrol type has a significant effect on accuracy. Comprehension is more likely correct in the condition of disambiguating sentence than the ambiguous sentence.
+
+#### Display type and accuracy
+
+We repete the permutation test for the sentence type.
+
+```{r}
+diff_acc_display <- difference_in_accuracy(df_sub,"displaytype","normal","X")
+print(diff_acc_display)
+
+set.seed(1)
+N_SAMPLES <- 1000
+stats_diff_acc_display <- rep(0, N_SAMPLES)
+n <- 0
+for (i in 1:N_SAMPLES) {
+  d_fake <- randomize_data(df_sub, "displaytype")
+  stats_diff_acc_display[i] <- difference_in_accuracy(d_fake,"displaytype","normal","X")
+  if (stats_diff_acc_display[i]>=diff_acc_display) {
+    n <- n+1
+  }
+  p_value_v = n/N_SAMPLES
+}
+set.seed(NULL)
+stats_display_diff_acc <- tibble::tibble(stats_diff_acc_display)
+print(p_value_v)
+
+```
+
+The p_value is 0.001 so the sentence type does have a significant effect on the comprehension accuracy, the normal type gives more likely the correct reading than the trial-mask paradigm.
+
+```{r}
+p_diff_acc_display <- ggplot2::ggplot(stats_display_diff_acc,
+                       ggplot2::aes_string(x=stats_diff_acc_display)) +
+    ggplot2::xlab("difference_acc_display")+
+    ggplot2::geom_histogram(fill="skyblue", colour="blue") +
+    ggplot2::ggtitle("Difference in accuracy by display type")+
+  ggplot2::geom_vline(ggplot2::aes(xintercept=diff_acc_display),
+                                 lwd=1)+
+  ggplot2::xlim(-0.08,0.08)
+print(p_diff_acc_display)
+```
+
+
+## Regressions and conditions
+
+### Analyse the regressions into the subject noun
+
+Does the sentence type or the display type influence the regressions into the subject noun ? We will have a look on the proportion of regression reading in condition of ambiguous/unambiguous sentence and in condition of normal/trial-mask display paradigm.
+
+We consider the "regression" as "at least one regression among 3 trials".
+
+```{r}
+df_sub_re <- subset(df,select = c(displaytype,verbcontrol,regin_n1,regin_n2,regin_n3,regout_n1,regout_n2,regout_n3,accuracy))
+for (i in 1:nrow(df_sub_re)) {
+  if (df_sub_re$regin_n1[i]+df_sub_re$regin_n2[i]+df_sub_re$regin_n3[i]>0) {
+    df_sub_re$regin[i] <- 1
+  }
+  else {
+    df_sub_re$regin[i] <- 0
+  }
+}
+for (i in 1:nrow(df_sub_re)) {
+  if (df_sub_re$regout_n1[i]+df_sub_re$regout_n2[i]+df_sub_re$regout_n3[i]>0) {
+    df_sub_re$regout[i] <- 1
+  }
+  else {
+    df_sub_re$regout[i] <- 0
+  }
+}
+df_sub_regin <- subset(df_sub_re, select=c(displaytype, verbcontrol, regin))
+df_sub_regout <- subset(df_sub_re, select=c(displaytype, verbcontrol, regout))
+
+# print(df_sub_regin)
+# print(df_sub_regout)
+
+
+```
+
+```{r}
+perc_control_x1_regin <- calculate_percentage(df_sub_regin,"control","X")
+perc_control_normal1_regin <- calculate_percentage(df_sub_regin,"control","normal")
+perc_path_x1_regin <- calculate_percentage(df_sub_regin,"gardenpath","X")
+perc_path_normal1_regin <- calculate_percentage(df_sub_regin,"gardenpath","normal")
+
+print(perc_control_x1_regin)
+print(perc_control_normal1_regin)
+print(perc_path_x1_regin)
+print(perc_path_normal1_regin)
+```
+
+We also visualize it.
+
+```{r}
+df_regin <- data.frame("SentenceType"=c("control","control","gardenpath","gardenpath"), "DisplayType"=c("X","normal","X","normal"), "Percentage"=c(perc_control_x1_regin,perc_control_normal1_regin,perc_path_x1_regin,perc_path_normal1_regin))
+
+
+p_regin <- ggplot2::ggplot(df_regin, ggplot2::aes(x=SentenceType,colour=DisplayType,y=Percentage), position_dodge(width=1.5)) + # construire un objet: graphe
+    ggplot2::geom_point()+
+  ggplot2::labs(y="Probability of Regression Into\n the subject noun")+
+    ggplot2::ylim(0,0.5)
+    
+print(p_regin)
+```
+
+### Permutation test to see the effect of sentence type and the display type to the probability of regressions into the subject noun.
+
+```{r}
+diff_regin_verbcontrol <- difference_in_accuracy(df_sub_regin,"verbcontrol","control","gardenpath")
+print(diff_regin_verbcontrol)
+```
+
+```{r}
+set.seed(2)
+N_SAMPLES <- 1000
+stats_diff_regin_verbcontrol <- rep(0, N_SAMPLES)
+n <- 0
+for (i in 1:N_SAMPLES) {
+  d_fake <- randomize_data(df_sub_regin, "verbcontrol")
+  stats_diff_regin_verbcontrol[i] <- difference_in_accuracy(d_fake,"verbcontrol","control","gardenpath")
+  if (stats_diff_regin_verbcontrol[i]>=diff_regin_verbcontrol) {
+    n <- n+1
+  }
+  p_value_re_v <- n/N_SAMPLES
+  if (p_value_re_v > 0.5) {
+    p_value_re_v <- 1-p_value_re_v
+  }
+}
+set.seed(NULL)
+stats_verbcontrol_diff_regin <- tibble::tibble(stats_diff_regin_verbcontrol)
+print(p_value_re_v)
+```
+
+So we have a p_value=0.076 which >0.05 and means that there's not a significant effect of sentence type on the probability of regression into the subject noun.
+
+```{r}
+p_diff_regin_verbcontrol <- ggplot2::ggplot(stats_verbcontrol_diff_regin,
+                       ggplot2::aes_string(x=stats_diff_regin_verbcontrol)) +
+    ggplot2::xlab("difference_regin_verbcontrol")+
+    ggplot2::geom_histogram(fill="skyblue", colour="blue") +
+    ggplot2::ggtitle("Difference in probability of regressions\n into subject noun by verbcontrol")+
+  ggplot2::geom_vline(ggplot2::aes(xintercept=diff_regin_verbcontrol),
+                                 lwd=1)+
+  ggplot2::xlim(-0.08,0.08)
+print(p_diff_regin_verbcontrol)
+```
+
+
+```{r}
+diff_regin_display <- difference_in_accuracy(df_sub_regin,"displaytype","normal","X")
+print(diff_regin_display)
+```
+
+```{r}
+set.seed(3)
+N_SAMPLES <- 1000
+stats_diff_regin_display <- rep(0, N_SAMPLES)
+n <- 0
+for (i in 1:N_SAMPLES) {
+  d_fake <- randomize_data(df_sub_regin, "displaytype")
+  stats_diff_regin_display[i] <- difference_in_accuracy(d_fake,"displaytype","normal","X")
+  if (stats_diff_regin_display[i]>diff_regin_display) {
+    n <- n+1
+  }
+  p_value = n/N_SAMPLES
+  if (p_value > 0.5) {
+    p_value <- 1-p_value
+  }
+}
+set.seed(NULL)
+stats_display_diff_regin <- tibble::tibble(stats_diff_regin_display)
+print(p_value)
+```
+
+```{r}
+p_diff_regin_display <- ggplot2::ggplot(stats_display_diff_regin,
+                       ggplot2::aes_string(x=stats_diff_regin_display)) +
+    ggplot2::xlab("difference_regin_display")+
+    ggplot2::geom_histogram(fill="skyblue", colour="blue") +
+    ggplot2::ggtitle("Difference in probability of regressions\n into subject noun by display type")+
+  ggplot2::geom_vline(ggplot2::aes(xintercept=diff_regin_display),
+                                 lwd=1)+
+  ggplot2::xlim(-0.08,0.08)
+print(p_diff_regin_display)
+```
+
+Since the p_value is 0, so that there's a significant effect of display type to the probability of regressions into the subject noun. The normal display is much more likely to cause a regression reading than the trial-mask paradigm.
+
+#### chi-square test for display type and sentence type
+
+We examine the dependency between display type and sentence type by using chi-square test:
+
+```{r}
+df_sub_regin1 <- dplyr::filter(df_sub_regin,regin==1)
+tb3 <- table(df_sub_regin1$displaytype, df_sub_regin1$verbcontrol)
+chisq.test(tb3)
+```
+
+```{r}
+df_sub_regin0 <- dplyr::filter(df_sub_regin,regin==0)
+tb4 <- table(df_sub_regin0$displaytype, df_sub_regin0$verbcontrol)
+chisq.test(tb4)
+```
+
+```{r}
+tb5 <- table(df_sub_regin$displaytype, df_sub_regin$verbcontrol)
+chisq.test(tb5)
+```
+
+We can take the null hypothesis and say that these two conditions are independent each to other.
+
+### Analyse the regressions out of the disambiguiting verb
+
+This work is similar to the analyse of the regression into the subject noun. We already have the data frame of regression out.
+
+```{r}
+perc_control_x1_regout <- calculate_percentage(df_sub_regout,"control","X")
+perc_control_normal1_regout <- calculate_percentage(df_sub_regout,"control","normal")
+perc_path_x1_regout <- calculate_percentage(df_sub_regout,"gardenpath","X")
+perc_path_normal1_regout <- calculate_percentage(df_sub_regout,"gardenpath","normal")
+
+print(perc_control_x1_regout)
+print(perc_control_normal1_regout)
+print(perc_path_x1_regout)
+print(perc_path_normal1_regout)
+```
+
+```{r}
+df_regout <- data.frame("SentenceType"=c("control","control","gardenpath","gardenpath"), "DisplayType"=c("X","normal","X","normal"), "Percentage"=c(perc_control_x1_regout,perc_control_normal1_regout,perc_path_x1_regout,perc_path_normal1_regout))
+
+
+p_regout <- ggplot2::ggplot(df_regout, ggplot2::aes(x=SentenceType,colour=DisplayType,y=Percentage), position_dodge(width=1.5)) + # construire un objet: graphe
+    ggplot2::geom_point()+
+  ggplot2::labs(y="Probability of Regression Out\n of the disambiguating verb")+
+    ggplot2::ylim(0,0.5)
+    
+print(p_regout)
+```
+
+### Permutation test to see the effect of sentence type and the display type to the probability of regressions out of the disambiguating verb.
+
+```{r}
+diff_regout_verbcontrol <- difference_in_accuracy(df_sub_regout,"verbcontrol","control","gardenpath")
+print(diff_regout_verbcontrol)
+```
+
+```{r}
+set.seed(4)
+N_SAMPLES <- 1000
+stats_diff_regout_verbcontrol <- rep(0, N_SAMPLES)
+n <- 0
+for (i in 1:N_SAMPLES) {
+  d_fake <- randomize_data(df_sub_regout, "verbcontrol")
+  stats_diff_regout_verbcontrol[i] <- difference_in_accuracy(d_fake,"verbcontrol","control","gardenpath")
+  if (stats_diff_regout_verbcontrol[i]>=diff_regout_verbcontrol) {
+    n <- n+1
+  }
+  p_value_re_v <- n/N_SAMPLES
+  if (p_value_re_v > 0.5) {
+    p_value_re_v <- 1-p_value_re_v
+  }
+}
+set.seed(NULL)
+stats_verbcontrol_diff_regout <- tibble::tibble(stats_diff_regout_verbcontrol)
+print(p_value_re_v)
+```
+
+```{r}
+p_diff_regout_verbcontrol <- ggplot2::ggplot(stats_verbcontrol_diff_regout,
+                       ggplot2::aes_string(x=stats_diff_regout_verbcontrol)) +
+    ggplot2::xlab("difference_regout_verbcontrol")+
+    ggplot2::geom_histogram(fill="skyblue", colour="blue") +
+    ggplot2::ggtitle("Difference in probability of regressions\n out of the disambiguating verb by verbcontrol")+
+  ggplot2::geom_vline(ggplot2::aes(xintercept=diff_regout_verbcontrol),
+                                 lwd=1)+
+  ggplot2::xlim(-0.08,0.08)
+print(p_diff_regout_verbcontrol)
+```
+
+There's no significant effect of sentence type to the probability of regressions out of disambiguating verb.
+
+#### Display type and regression out of the disambiguating verb
+
+```{r}
+diff_regout_display <- difference_in_accuracy(df_sub_regout,"displaytype","normal","X")
+print(diff_regout_display)
+```
+
+```{r}
+set.seed(5)
+N_SAMPLES <- 1000
+stats_diff_regout_display <- rep(0, N_SAMPLES)
+n <- 0
+for (i in 1:N_SAMPLES) {
+  d_fake <- randomize_data(df_sub_regout, "displaytype")
+  stats_diff_regout_display[i] <- difference_in_accuracy(d_fake,"displaytype","normal","X")
+  if (stats_diff_regout_display[i]>=diff_regout_display) {
+    n <- n+1
+  }
+  p_value_re_d <- n/N_SAMPLES
+  if (p_value_re_d > 0.5) {
+    p_value_re_d <- 1-p_value_re_d
+  }
+}
+set.seed(NULL)
+stats_display_diff_regout <- tibble::tibble(stats_diff_regout_display)
+print(p_value_re_d)
+```
+
+```{r}
+p_diff_regout_display <- ggplot2::ggplot(stats_display_diff_regout,
+                       ggplot2::aes_string(x=stats_diff_regout_display)) +
+    ggplot2::xlab("difference_regout_display")+
+    ggplot2::geom_histogram(fill="skyblue", colour="blue") +
+    ggplot2::ggtitle("Difference in probability of regressions\n out of the disambiguating verb by display type")+
+  ggplot2::geom_vline(ggplot2::aes(xintercept=diff_regout_display),
+                                 lwd=1)+
+  ggplot2::xlim(-0.1,0.1)
+print(p_diff_regout_display)
+```
+
+There's a significant effect of display type to the regressions out of verb, the normal display type gives more probability to the regressions out of the verb.
+
+## Regressions and accuracy
+
+Only the regressions back to the word are the real regressions. So we analyse only the regressions into the subject noun.
+
+```{r}
+df_reg_acc <- df_sub_regin
+df_reg_acc$accuracy <- df_sub_re$accuracy
+# print(df_reg_acc)
+```
+
+### Percentage of accuracy in different combinaision of conditions.
+
+```{r}
+perc_control_x_reg1_acc <- calculate_percentage_reg(df_reg_acc,"control","X",1)
+perc_control_x_reg0_acc <- calculate_percentage_reg(df_reg_acc,"control","X",0)
+perc_control_normal_reg1_acc <- calculate_percentage_reg(df_reg_acc,"control","normal",1)
+perc_control_normal_reg0_acc <- calculate_percentage_reg(df_reg_acc,"control","normal",0)
+perc_path_x_reg1_acc <- calculate_percentage_reg(df_reg_acc,"gardenpath","X",1)
+perc_path_x_reg0_acc <- calculate_percentage_reg(df_reg_acc,"gardenpath","X",0)
+perc_path_normal_reg1_acc <- calculate_percentage_reg(df_reg_acc,"gardenpath","normal",1)
+perc_path_normal_reg0_acc <- calculate_percentage_reg(df_reg_acc,"gardenpath","normal",0)
+
+print(perc_control_x_reg1_acc)
+print(perc_control_x_reg0_acc)
+print(perc_control_normal_reg1_acc)
+print(perc_control_normal_reg0_acc)
+print(perc_path_x_reg1_acc)
+print(perc_path_x_reg0_acc)
+print(perc_path_normal_reg1_acc)
+print(perc_path_normal_reg0_acc)
+
+```
+
+```{r}
+df_reg <- data.frame("SentenceType"=c("control","control","control","control","gardenpath","gardenpath","gardenpath","gardenpath"), "DisplayType"=c("X","X","normal","normal","X","X","normal","normal"),"Regvalue"=c("1","0","1","0","1","0","1","0"), "Percentage"=c(perc_control_x_reg1_acc,perc_control_x_reg0_acc,perc_control_normal_reg1_acc,perc_control_normal_reg0_acc,perc_path_x_reg1_acc,perc_path_x_reg0_acc,perc_path_normal_reg1_acc,perc_path_normal_reg0_acc))
+
+
+p_d_reg <- ggplot2::ggplot(df_reg, ggplot2::aes(x=SentenceType,shape=DisplayType,colour=Regvalue,y=Percentage), position_dodge(width=1.5)) + # construire un objet: graphe
+    ggplot2::geom_point()+
+    ggplot2::ylim(0,1)
+print(p_d_reg)
+```
+
+### Percentage of accuracy by looking the regressions only (0 or 1)
+
+```{r}
+diff_acc_reg <- difference_in_accuracy(df_reg_acc,"regin","1","0")
+print(diff_acc_reg)
+```
+
+```{r}
+set.seed(6)
+
+N_SAMPLES <- 1000
+stats_diff_reg_acc <- rep(0, N_SAMPLES)
+n <- 0
+for (i in 1:N_SAMPLES) {
+  d_fake <- randomize_data(df_reg_acc, "regin")
+  stats_diff_reg_acc[i] <- difference_in_accuracy(d_fake,"regin","1","0")
+  if (stats_diff_reg_acc[i]>=diff_acc_reg) {
+    n <- n+1
+  }
+  p_value_re <- n/N_SAMPLES
+  if (p_value_re > 0.5) {
+    p_value_re <- 1-p_value_re
+  }
+}
+
+set.seed(NULL)
+stats_reg_diff_acc <- tibble::tibble(stats_diff_reg_acc)
+print(p_value_re)
+```
+
+
+```{r}
+p_diff_reg_acc <- ggplot2::ggplot(stats_reg_diff_acc,
+                       ggplot2::aes_string(x=stats_diff_reg_acc)) +
+    ggplot2::xlab("difference_reg_acc")+
+    ggplot2::geom_histogram(fill="skyblue", colour="blue") +
+    ggplot2::ggtitle("Difference in percentage of accuracy by \nregression reading/non-regression reading")+
+  ggplot2::geom_vline(ggplot2::aes(xintercept=diff_acc_reg),
+                                 lwd=1)+
+  ggplot2::xlim(-0.1,0.1)
+print(p_diff_reg_acc)
+```
+
+This p_value is far away from what we wait for. So I decided to do a power test to see if this p_value is normal.
+
+```{r}
+ptest1 <- function(df_reg_acc, diff_obtenu){
+  N_SAMPLES <- 1000
+  stats_diff_reg_acc <- rep(0, N_SAMPLES)
+  n <- 0
+  for (i in 1:N_SAMPLES) {
+    d_fake <- randomize_data(df_reg_acc, "regin")
+    stats_diff_reg_acc[i] <- difference_in_accuracy(d_fake,"regin","1","0")
+    if (stats_diff_reg_acc[i]>=diff_obtenu) {
+      n <- n+1
+    }
+    p_value_re <- n/N_SAMPLES
+    if (p_value_re > 0.5) {
+      p_value_re <- 1-p_value_re
+    }
+  }
+return(p_value_re)
+}
+```
+
+```{r}
+N_power <- 100
+ptest1_results <- rep(0,N_power)
+for (i in 1:N_power) {
+  ptest1_results[i] <- ptest1(df_reg_acc, diff_obtenu=diff_acc_reg)
+}
+```
+
+```{r}
+ptestplot <- ggplot2::ggplot(tibble::tibble(ptest1_results = ptest1_results), ggplot2::aes(x=ptest1_results))+
+  ggplot2::geom_histogram(fill="#BBDDF0", colour="black")+
+  ggplot2::geom_vline(xintercept=p_value_re)
+print(ptestplot)
+```
+
+Estimated power (1 - Type 2 error rate) for a test at the 0.05 significance level:
+
+```{r}
+1-sum(ptest1_results>0.05)/N_power
+```
+
+It seems that the regression from the general point of # print, is not significant for the reading comprehension. 
+
+### Discussions of the effect of regression to reading comprehension in different trial types
+
+I started to be very confused and then I simulate the experiments that the paper has reported.
+
+> To assess the degree to which regressions supported reading comprehension, we compared comprehension accuracy across three trial types: (a) normal-reading trials in which the subject made a regression out of the disambiguating verb, (b) normal-reading trials in which the subject did not make a regression out of this region, and (c) trailing-mask trials in which the subject did
+not make a regression out of this region.
+
+The author used the contr.sdif function in the MASS package in R to test for successive differences in comprehension accuracy between these trial types. That is (a) VS (b), and then (b) VS (c). Anyway, we can at least tell that the sentence type is now a less considered point for the analyse.
+
+I first tried the calculate that made by myself for (a) vs (b).
+
+#### (a) VS (b)
+
+```{r}
+df_reg_acc_normal <- dplyr::filter(df_reg_acc, displaytype=="normal")
+# print(df_reg_acc_normal)
+
+```
+
+```{r}
+diff_acc_reg_normal <- difference_in_accuracy(df_reg_acc_normal,"regin","1","0")
+print(diff_acc_reg_normal)
+```
+
+```{r}
+p_value_reg_normal <- ptest1(df_reg_acc_normal,diff_acc_reg_normal)
+print(p_value_reg_normal)
+```
+
+This p_value is more than 0.05, so there's no report of significance of the regression to the comprehension accuracy in the condition of normal display.
+
+#### (b) vs (c)
+
+```{r}
+df_reg0_acc <- dplyr::filter(df_reg_acc, regin=="0")
+# print(df_reg0_acc)
+```
+
+```{r}
+diff_acc_reg0 <- difference_in_accuracy(df_reg0_acc,"displaytype","normal","X")
+print(diff_acc_reg0)
+```
+
+```{r}
+ptest2 <- function(df_reg0_acc, diff_obtenu){
+  N_SAMPLES <- 1000
+  stats_diff_reg_acc <- rep(0, N_SAMPLES)
+  n <- 0
+  for (i in 1:N_SAMPLES) {
+    d_fake <- randomize_data(df_reg0_acc, "displaytype")
+    stats_diff_reg_acc[i] <- difference_in_accuracy(d_fake,"displaytype","normal","X")
+    if (stats_diff_reg_acc[i]>=diff_obtenu) {
+      n <- n+1
+    }
+    p_value_re <- n/N_SAMPLES
+    if (p_value_re > 0.5) {
+      p_value_re <- 1-p_value_re
+    }
+  }
+return(p_value_re)
+}
+p_value_reg0 <- ptest2(df_reg0_acc, diff_acc_reg0)
+print(p_value_reg0)
+```
+
+From this we can see that there's a significant difference between not able to reread the text when normal display and when trial-mask paradigm display.
+
+We then have a power test on it.
+
+```{r}
+N_power <- 100
+ptest2_results <- rep(0,N_power)
+for (i in 1:N_power) {
+  ptest2_results[i] <- ptest2(df_reg0_acc, diff_obtenu=diff_acc_reg0)
+}
+```
+
+```{r}
+ptest2plot <- ggplot2::ggplot(tibble::tibble(ptest2_results = ptest2_results), ggplot2::aes(x=ptest2_results))+
+  ggplot2::geom_histogram(fill="#BBDDF0", colour="black")+
+  ggplot2::geom_vline(xintercept=p_value_reg0,lwd=1)
+print(ptest2plot)
+```
+
+We have all p_values <0.05, so readers could not help making a regression despite knowing that a regression would not provide them additional information about the text. When they have access to the information of rereading (in normal display), the comprehension accuracy is more higher than when the informations are masked (in trial-mask display). 
+
+
